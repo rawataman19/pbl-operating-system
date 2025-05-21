@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deadlock Detection</title>
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    #network { 
+      width: 100%; 
+      height: 500px; 
+      border: 2px solid #8B1C2A; /* Blood red border */
+      border-radius: 8px; 
+      background: #ffffff; /* White background for graph area */
+    }
+    /* Ensure vis-network labels have black text on white background */
+    .vis-label {
+      color: #000000 !important; /* Black text for labels on white background */
+    }
+  </style>
+</head>
+<body class="bg-[#2A2A2A] min-h-screen flex flex-col items-center p-4">
+  <h1 class="text-4xl font-bold text-white mb-6 text-center">🔗 Deadlock Detection</h1>
+
+  <!-- Input Section -->
+  <div class="bg-[#3A3A3A] p-6 rounded-lg shadow-lg w-full max-w-2xl mb-4 border border-[#8B1C2A]">
+    <div class="flex flex-wrap gap-4">
+      <input type="text" id="from" placeholder="From (e.g., P1)" class="flex-1 p-2 border border-[#8B1C2A] rounded-lg bg-white text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#A1323A]">
+      <input type="text" id="to" placeholder="To (e.g., R1)" class="flex-1 p-2 border border-[#8B1C2A] rounded-lg bg-white text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#A1323A]">
+      <select id="type" class="p-2 border border-[#8B1C2A] rounded-lg bg-white text-black focus:outline-none focus:ring-2 focus:ring-[#A1323A]">
+        <option value="request" class="bg-white text-black">Request</option>
+        <option value="allocation" class="bg-white text-black">Allocation</option>
+      </select>
+    </div>
+    <div class="flex flex-wrap gap-2 mt-4">
+      <button onclick="addEdge()" class="bg-[#8B1C2A] text-black px-4 py-2 rounded-lg hover:bg-[#A1323A] transition">Add Edge</button>
+      <button onclick="deleteEdge()" class="bg-[#8B1C2A] text-black px-4 py-2 rounded-lg hover:bg-[#A1323A] transition">Delete Edge</button>
+      <button onclick="detectDeadlock()" class="bg-[#8B1C2A] text-black px-4 py-2 rounded-lg hover:bg-[#A1323A] transition">Detect Deadlock</button>
+      <button onclick="resetGraph()" class="bg-[#8B1C2A] text-black px-4 py-2 rounded-lg hover:bg-[#A1323A] transition">Reset Graph</button>
+      <button onclick="zoomIn()" class="bg-[#8B1C2A] text-black px-4 py-2 rounded-lg hover:bg-[#A1323A] transition">+ Zoom In</button>
+      <button onclick="zoomOut()" class="bg-[#8B1C2A] text-black px-4 py-2 rounded-lg hover:bg-[#A1323A] transition">- Zoom Out</button>
+    </div>
+  </div>
+
+  <!-- Graph and Result -->
+  <div class="w-full max-w-4xl">
+    <div id="network"></div>
+    <p id="result" class="mt-4 text-lg font-medium text-white text-center"></p>
+  </div>
+
+  <script>
+    const nodes = new vis.DataSet();
+    const edges = new vis.DataSet();
+    const graph = {}; // adjacency list
+
+    const container = document.getElementById("network");
+    const data = { nodes, edges };
+    const options = {
+      edges: { 
+        arrows: 'to', 
+        font: { align: 'top', size: 14, color: '#000000' }, /* Black text for edge labels on white background */
+        color: '#8B1C2A' /* Blood red edges */
+      },
+      nodes: { 
+        shape: 'ellipse', 
+        color: { background: '#8B1C2A', border: '#2A2A2A' }, /* Red background, black border for nodes */
+        font: { size: 16, color: '#000000' } /* Black text on red background for nodes */
+      },
+      physics: { stabilization: true }
+    };
+    const network = new vis.Network(container, data, options);
+
+    // Zoom Functions
+    function zoomIn() {
+      const scale = network.getScale() * 1.2;
+      network.moveTo({ scale: scale });
+    }
+
+    function zoomOut() {
+      const scale = network.getScale() / 1.2;
+      network.moveTo({ scale: scale });
+    }
+
+    // Add Edge Function
+    function addEdge() {
+      const from = document.getElementById("from").value.trim();
+      const to = document.getElementById("to").value.trim();
+      const type = document.getElementById("type").value;
+      const id = from + "_" + to;
+
+      if (!from || !to || from === to) {
+        document.getElementById("result").innerText = "⚠️ Please enter valid From and To nodes.";
+        return;
+      }
+
+      if (!nodes.get(from)) nodes.add({ id: from, label: from });
+      if (!nodes.get(to)) nodes.add({ id: to, label: to });
+
+      if (!edges.get(id)) {
+        edges.add({ id, from, to, label: type });
+        if (!graph[from]) graph[from] = [];
+        graph[from].push(to);
+        document.getElementById("result").innerText = "✅ Edge added.";
+      } else {
+        document.getElementById("result").innerText = "⚠️ Edge already exists.";
+      }
+    }
+
+    // Delete Edge Function
+    function deleteEdge() {
+      const from = document.getElementById("from").value.trim();
+      const to = document.getElementById("to").value.trim();
+      const id = from + "_" + to;
+
+      if (edges.get(id)) {
+        edges.remove(id);
+        if (graph[from]) {
+          graph[from] = graph[from].filter(v => v !== to);
+          if (graph[from].length === 0) delete graph[from];
+        }
+        document.getElementById("result").innerText = "🗑️ Edge deleted.";
+      } else {
+        document.getElementById("result").innerText = "⚠️ Edge not found.";
+      }
+    }
+
+    // Deadlock Detection
+    function detectDeadlock() {
+      const visited = {}, recStack = {};
+      function dfs(node) {
+        visited[node] = true;
+        recStack[node] = true;
+        for (const neighbor of (graph[node] || [])) {
+          if (!visited[neighbor] && dfs(neighbor)) return true;
+          else if (recStack[neighbor]) return true;
+        }
+        recStack[node] = false;
+        return false;
+      }
+
+      for (const node of nodes.getIds()) {
+        if (!visited[node]) {
+          if (dfs(node)) {
+            document.getElementById("result").innerText = "🔴 Deadlock Detected!";
+            return;
+          }
+        }
+      }
+      document.getElementById("result").innerText = "✅ No Deadlock Detected.";
+    }
+
+    // Reset Graph
+    function resetGraph() {
+      nodes.clear();
+      edges.clear();
+      for (let key in graph) delete graph[key];
+      network.moveTo({ scale: 1.0 }); // Reset zoom to default
+      document.getElementById("result").innerText = "🔄 Graph reset.";
+    }
+  </script>
+</body>
+</html>

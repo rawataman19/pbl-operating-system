@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Banker's Algorithm</title>
+  <style>
+    body {
+      background-color: #f8f9fa;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+    .container {
+      background-color: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      padding: 30px;
+      max-width: 700px;
+      width: 100%;
+    }
+    h1 {
+      font-size: 32px;
+      margin-bottom: 30px;
+      color: #2d3748;
+    }
+    label {
+      display: block;
+      margin: 15px 0 5px;
+      font-weight: 600;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .result {
+      margin-top: 30px;
+      padding: 15px;
+      background-color: #e2e8f0;
+      border-radius: 8px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Banker's Algorithm</h1>
+    
+    <label for="processes">Number of Processes:</label>
+    <input type="number" id="processes" min="1" value="5">
+
+    <label for="resources">Number of Resources:</label>
+    <input type="number" id="resources" min="1" value="3">
+
+    <label for="allocated">Allocated Matrix (comma separated rows):</label>
+    <textarea id="allocated" rows="4" placeholder="e.g. 0 1 0, 2 0 0, 3 0 2"></textarea>
+
+    <label for="max">Max Matrix (comma separated rows):</label>
+    <textarea id="max" rows="4" placeholder="e.g. 7 5 3, 3 2 2, 9 0 2"></textarea>
+
+    <label for="available">Available Resources:</label>
+    <input type="text" id="available" placeholder="e.g. 3 3 2">
+
+    <button onclick="runBankersAlgorithm()">Run Banker's Algorithm</button>
+
+    <div class="result" id="output"></div>
+  </div>
+
+  <script>
+    function parseMatrix(input) {
+      return input.trim().split(',').map(row => row.trim().split(/\s+/).map(Number));
+    }
+
+    function runBankersAlgorithm() {
+      const processes = parseInt(document.getElementById('processes').value);
+      const resources = parseInt(document.getElementById('resources').value);
+      const alloc = parseMatrix(document.getElementById('allocated').value);
+      const max = parseMatrix(document.getElementById('max').value);
+      const avail = document.getElementById('available').value.trim().split(/\s+/).map(Number);
+
+      const need = Array.from({ length: processes }, (_, i) =>
+        max[i].map((m, j) => m - alloc[i][j])
+      );
+
+      const finish = Array(processes).fill(false);
+      const safeSeq = [];
+      const work = [...avail];
+
+      let found;
+      do {
+        found = false;
+        for (let i = 0; i < processes; i++) {
+          if (!finish[i] && need[i].every((n, j) => n <= work[j])) {
+            for (let j = 0; j < resources; j++) {
+              work[j] += alloc[i][j];
+            }
+            safeSeq.push(`P${i}`);
+            finish[i] = true;
+            found = true;
+          }
+        }
+      } while (found);
+
+      const output = document.getElementById('output');
+      if (finish.every(f => f)) {
+        output.innerHTML = `<strong>Safe Sequence:</strong> ${safeSeq.join(' → ')}`;
+      } else {
+        output.innerHTML = '<strong style="color:red">Deadlock detected! No safe sequence.</strong>';
+      }
+    }
+  </script>
+</body>
+</html>
